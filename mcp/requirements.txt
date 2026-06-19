@@ -1,0 +1,4 @@
+# Dependencies for the remote (Streamable HTTP) librarian MCP server.
+# The stdio server (librarian_mcp.py) needs none of these.
+mcp>=1.2
+uvicorn>=0.30

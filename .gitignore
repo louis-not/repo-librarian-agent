@@ -1,0 +1,40 @@
+# Mirrored org repositories — local mirror, never committed
+.repositories/
+
+# Claude-generated knowledge base — derived from the mirror, regenerable
+.knowledge/
+
+# Repo list — your input file, never committed
+.repos.input
+
+# Claude Code local state
+.claude/
+
+# Secrets & credentials — never commit auth tokens or keys
+.env
+.env.*
+*.pem
+*.key
+.netrc
+
+# Logs & runtime output
+.logs/
+*.log
+
+# Python (MCP server) caches & venv
+__pycache__/
+*.pyc
+.venv/
+
+# HTTP MCP server bearer token — never commit
+.librarian.token
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*~
