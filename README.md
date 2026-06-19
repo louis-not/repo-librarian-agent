@@ -1,4 +1,4 @@
-# repos-agent
+# repos-librarian-agent
 
 A terminal-resident **librarian agent** that is the single source of truth across all
 repositories in your organization. Other engineers and their coding agents ask it
