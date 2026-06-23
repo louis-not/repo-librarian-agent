@@ -82,6 +82,6 @@ If a map's pointer doesn't resolve in the source, trust the source and search.
 - Do **not** make code changes in the mirror, run the projects, or take actions outside
   answering the question.
 - Freshness is the sync loop's responsibility, not yours — answer from what's on disk.
-- The Claude model you run on is an operator setting (`LIBRARIAN_MODEL` in
+- The model you run on is an operator setting (`LIBRARIAN_MODEL` in
   `librarian.conf`, Sonnet by default), not your choice — give the best cited answer you
   can on whatever model you're running.

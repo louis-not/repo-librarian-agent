@@ -20,6 +20,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Load central settings (model selection, etc.) from librarian.conf at the repo
 # root; an env var of the same name still wins. See that file to change the model.
 [ -f "$ROOT_DIR/librarian.conf" ] && . "$ROOT_DIR/librarian.conf"
+AGENT="${LIBRARIAN_AGENT:-agy}"
 MODEL="${LIBRARIAN_MODEL:-sonnet}"
 
 # Question from args, or from stdin if none were given.
@@ -32,8 +33,8 @@ if [ -z "${QUESTION// /}" ]; then
   exit 1
 fi
 
-if ! command -v claude >/dev/null 2>&1; then
-  echo "error: the 'claude' CLI is not on PATH." >&2
+if ! command -v "$AGENT" >/dev/null 2>&1; then
+  echo "error: the '$AGENT' CLI is not on PATH." >&2
   exit 1
 fi
 
@@ -44,5 +45,5 @@ unset ANTHROPIC_API_KEY
 # Run from the project root so CLAUDE.md auto-loads and .repositories/ is in
 # scope. Read-only tools only — the librarian answers, never modifies.
 cd "$ROOT_DIR"
-exec claude -p "$QUESTION" --model "$MODEL" \
+exec "$AGENT" -p "$QUESTION" --model "$MODEL" \
   --allowedTools "Read,Grep,Glob,Bash(git log:*),Bash(git show:*),Bash(git blame:*)"

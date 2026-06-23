@@ -25,6 +25,9 @@ set -uo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+[ -f "$ROOT_DIR/librarian.conf" ] && . "$ROOT_DIR/librarian.conf"
+AGENT="${LIBRARIAN_AGENT:-agy}"
+
 SESSIONS=(librarian librarian-backfill librarian-http librarian-feed)
 
 # --- 1. Stop the orchestrators first (so they can't spawn new workers) --------
@@ -37,20 +40,20 @@ for s in "${SESSIONS[@]}"; do
   fi
 done
 
-# --- 2. Reap stray librarian claude workers (backfill / digest / ask) ---------
-# Orphaned `claude -p` children survive their tmux pane; hand-run `bash utils/ask.sh`
+# --- 2. Reap stray librarian agent workers (backfill / digest / ask) ---------
+# Orphaned `$AGENT -p` children survive their tmux pane; hand-run `bash utils/ask.sh`
 # and MCP-spawned workers live outside tmux entirely. Scope by cwd (this repo) AND
-# print-mode so an interactive Claude session in this directory is never touched.
+# print-mode so an interactive Claude/Antigravity session in this directory is never touched.
 reaped=0
 if [ -d /proc ]; then
-  for pid in $(pgrep -f claude 2>/dev/null); do
+  for pid in $(pgrep -f "$AGENT" 2>/dev/null); do
     [ "$pid" = "$$" ] && continue
     cwd="$(readlink -f "/proc/$pid/cwd" 2>/dev/null)" || continue
     case "$cwd" in "$ROOT_DIR"|"$ROOT_DIR"/*) ;; *) continue ;; esac
     cmdline="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null)" || continue
     case " $cmdline" in
       *" -p "*|*" -p"|*" --print "*|*" --print")
-        kill "$pid" 2>/dev/null && { echo "stopped  claude worker (pid $pid)"; reaped=$((reaped + 1)); } ;;
+        kill "$pid" 2>/dev/null && { echo "stopped  agent worker (pid $pid)"; reaped=$((reaped + 1)); } ;;
     esac
   done
 fi
@@ -65,5 +68,5 @@ echo "----"
 if [ "$stopped" -eq 0 ] && [ "$reaped" -eq 0 ]; then
   echo "Nothing was running."
 else
-  echo "All librarian services and claude workers stopped."
+  echo "All librarian services and agent workers stopped."
 fi

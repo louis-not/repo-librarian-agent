@@ -5,10 +5,10 @@ repositories in your organization. Other engineers and their coding agents ask i
 questions during development — "how does X work?", "where are the docs for Y?", "what's
 the API for Z?" — and it answers across every mirrored repo with **cited** results.
 
-It runs on your **existing Claude subscription** (Claude Code), not metered API billing:
-the librarian is a headless `claude -p` query that reads and synthesizes across the
+It runs on your **existing AI subscription**, not metered API billing:
+the librarian is a headless `agy -p` (or `claude -p`) query that reads and synthesizes across the
 mirror. The librarian's operating instructions are in [CLAUDE.md](CLAUDE.md) (its system
-prompt, auto-loaded whenever Claude runs in this directory).
+prompt, auto-loaded whenever the AI agent runs in this directory).
 
 ## How it fits together
 
@@ -19,10 +19,10 @@ prompt, auto-loaded whenever Claude runs in this directory).
                   ┌─────────────────────────┴───────────────────────┐
                   │                                                   │
         mcp/librarian_mcp.py (stdio)                 mcp/librarian_http.py (HTTP+token)
-        for THIS machine's Claude                    for OTHER machines / a VM
+        for THIS machine's Agent                     for OTHER machines / a VM
                   └───────────────────┬───────────────────────────────┘
                                       ▼
-                         claude -p over the mirror  ──▶ cited answer
+                         agy -p over the mirror     ──▶ cited answer
 ```
 
 Two independent concerns, deliberately split:
@@ -33,7 +33,7 @@ Two independent concerns, deliberately split:
 
 ## Quick start
 
-Prerequisites: `claude` (logged in to your subscription), `git`, `tmux`, and `python3`.
+Prerequisites: `agy` (Google Antigravity) or `claude` (logged in to your subscription), `git`, `tmux`, and `python3`.
 
 ```bash
 # 1. one-time: list the repos you want, then sync them
@@ -71,7 +71,8 @@ is plain `KEY=value` shell with inline docs for every setting.
 
 | Setting | Default | What it does |
 |---|---|---|
-| `LIBRARIAN_MODEL` | `sonnet` | Claude model the librarian runs on (`claude --model`). Alias (`sonnet`/`opus`/`haiku`) or full id. |
+| `LIBRARIAN_AGENT` | `agy` | Which AI terminal CLI the librarian uses (`agy` or `claude`). |
+| `LIBRARIAN_MODEL` | `sonnet` | The model the librarian runs on (`--model`). Alias (`sonnet`/`opus`/`haiku`) or full id. |
 | `LIBRARIAN_SYNC_INTERVAL` | `15m` | How often the sync daemon re-syncs the mirror. (A positional arg to `init.sh` still wins.) |
 | `LIBRARIAN_HOST` / `LIBRARIAN_PORT` | `127.0.0.1` / `8008` | Bind address for the remote HTTP MCP server. |
 | `BACKFILL_PACE_SECONDS` | `7200` | Sleep between cold-start deep-map cycles (paced around usage limits). Lower = faster. |
@@ -88,26 +89,26 @@ LIBRARIAN_MODEL=opus bash utils/ask.sh "the hard cross-repo question"
 BACKFILL_PACE_SECONDS=0 bash utils/backfill.sh      # one-off: build with no pacing
 ```
 
-## Integrate with your Claude
+## Integrate with your Agent
 
 There are two transports. **For local use you're already done** — pick based on where
-your Claude runs:
+your agent runs:
 
-| Your Claude runs… | Use | Setup |
+| Your agent runs… | Use | Setup |
 |---|---|---|
-| on **this machine** | stdio `librarian` | one-time `claude mcp add` (below) |
-| on **another machine / a VM** | HTTP `librarian-http` + token | `claude mcp add --transport http …` (below) |
+| on **this machine** | stdio `librarian` | one-time `agy mcp add` (below) |
+| on **another machine / a VM** | HTTP `librarian-http` + token | `agy mcp add --transport http …` (below) |
 
 ### Local — stdio (recommended on this machine)
 
 Register the stdio server once, at **user scope** so it's available in *every* project:
 
 ```bash
-claude mcp add --scope user librarian -- python3 "$(pwd)/mcp/librarian_mcp.py"
-claude mcp list              # expect: librarian … ✓ Connected
+agy mcp add --scope user librarian -- python3 "$(pwd)/mcp/librarian_mcp.py"
+agy mcp list              # expect: librarian … ✓ Connected
 ```
 
-That's it. Open `claude` in **any** repo and the librarian tools are there. Verify and
+That's it. Open `agy` (or `claude`) in **any** repo and the librarian tools are there. Verify and
 use:
 
 ```
@@ -118,11 +119,11 @@ use:
 Or headless from a script / another agent:
 
 ```bash
-claude -p "ask the librarian what port the crawler service uses" \
+agy -p "ask the librarian what port the crawler service uses" \
   --allowedTools "mcp__librarian__ask_librarian"
 ```
 
-The stdio server reads `.repositories/` directly and spawns its own `claude -p`, so it
+The stdio server reads `.repositories/` directly and spawns its own `agy -p` (or `claude -p`), so it
 needs the **`librarian` sync session** running (for freshness) but **not** the HTTP one.
 
 ### Remote — HTTP + bearer token (for a VM)
@@ -131,15 +132,15 @@ When the mirror lives on another machine, register that machine's HTTP endpoint.
 bearer token is generated once by `init.sh` and stored in `.librarian.token`:
 
 ```bash
-claude mcp add --transport http librarian-remote http://YOUR_HOST:8008/mcp \
+agy mcp add --transport http librarian-remote http://YOUR_HOST:8008/mcp \
   --header "Authorization: Bearer $(cat .librarian.token)"
 ```
 
 Notes:
 - Register it under a **different name** (`librarian-remote`) so it doesn't collide with
   the stdio `librarian` at user scope.
-- On the VM, `ask_librarian` runs `claude -p` *there*, so the VM needs `claude`
-  authenticated — run `claude setup-token` on it to use your subscription.
+- On the VM, `ask_librarian` runs `agy -p` (or `claude -p`) *there*, so the VM needs `agy`
+  authenticated.
 - The token is cleartext over plain HTTP. Bind to `127.0.0.1` and front it with an HTTPS
   reverse proxy (Caddy/nginx), or reach it over an SSH tunnel/VPN.
 
@@ -212,7 +213,7 @@ repos-agent/
 │   ├── requirements.txt    # deps for the HTTP server (mcp, uvicorn)
 │   └── watch.sh            # tmux live viewer of the answer feed
 ├── utils/
-│   └── ask.sh             # ask the librarian from the CLI (claude -p wrapper)
+│   └── ask.sh             # ask the librarian from the CLI (agy -p wrapper)
 ├── .repos.input        # your repo list           (hidden, gitignored)
 ├── .repositories/      # local mirror of org repos (hidden, gitignored)
 ├── .librarian.token    # HTTP bearer token         (hidden, gitignored)

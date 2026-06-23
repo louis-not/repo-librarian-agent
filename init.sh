@@ -70,11 +70,12 @@ fi
 
 # --- 2. Preconditions --------------------------------------------------------
 # Every command the librarian and its sync loop rely on must be installed.
-#   claude — the CLI that runs the librarian
-#   git    — used by loop.sh to clone/pull the mirrored repositories
-#   tmux   — hosts the persistent detached session
+#   claude/agy — the CLI that runs the librarian
+#   git        — used by loop.sh to clone/pull the mirrored repositories
+#   tmux       — hosts the persistent detached session
 missing=()
-for cmd in claude git tmux; do
+AGENT="${LIBRARIAN_AGENT:-agy}"
+for cmd in "$AGENT" git tmux; do
   command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
 done
 if [ "${#missing[@]}" -gt 0 ]; then
@@ -83,6 +84,7 @@ if [ "${#missing[@]}" -gt 0 ]; then
   for cmd in "${missing[@]}"; do
     case "$cmd" in
       claude) echo "  claude: npm install -g @anthropic-ai/claude-code" >&2 ;;
+      agy)    echo "  agy:    install the Google Antigravity CLI" >&2 ;;
       git)    echo "  git:    apt install git   (or: brew install git)" >&2 ;;
       tmux)   echo "  tmux:   apt install tmux  (or: brew install tmux)" >&2 ;;
     esac
@@ -189,7 +191,7 @@ if [ -z "${LIBRARIAN_NO_HTTP:-}" ]; then
       "LIBRARIAN_TOKEN='$TOKEN' LIBRARIAN_HOST='$HTTP_HOST' LIBRARIAN_PORT='$HTTP_PORT' LIBRARIAN_ALLOWED_HOSTS='${LIBRARIAN_ALLOWED_HOSTS:-}' '$VENV_PY' '$SCRIPT_DIR/mcp/librarian_http.py' 2>&1 | tee -a '$LOGS_DIR/http.log'"
     echo "HTTP MCP server started in tmux '$HTTP_SESSION' → http://$HTTP_HOST:$HTTP_PORT/mcp"
     echo "Register a client with:"
-    echo "  claude mcp add --transport http librarian http://$HTTP_HOST:$HTTP_PORT/mcp --header \"Authorization: Bearer $TOKEN\""
+    echo "  $AGENT mcp add --transport http librarian http://$HTTP_HOST:$HTTP_PORT/mcp --header \"Authorization: Bearer $TOKEN\""
   fi
 fi
 

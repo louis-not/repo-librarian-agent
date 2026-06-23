@@ -71,7 +71,8 @@ BATCH="${BACKFILL_BATCH:-20}";            [ "$BATCH" -lt 1 ] && BATCH=1
 PACE="${BACKFILL_PACE_SECONDS:-7200}";    [ "$PACE" -lt 0 ] && PACE=0
 STUB_BATCH="${BACKFILL_STUB_BATCH:-12}";  [ "$STUB_BATCH" -lt 1 ] && STUB_BATCH=1
 RETRIES="${BACKFILL_RETRIES:-3}"
-MODEL="${LIBRARIAN_MODEL:-sonnet}"        # passed to `claude --model`
+AGENT="${LIBRARIAN_AGENT:-agy}"           # CLI agent
+MODEL="${LIBRARIAN_MODEL:-sonnet}"        # passed to `--model`
 
 # --- needs_map: mirror digest.sh's skip rule (missing/provisional/stale) ------
 needs_map() {
@@ -148,8 +149,8 @@ esac
 # ============================================================================
 # run
 # ============================================================================
-if ! command -v claude >/dev/null 2>&1; then
-  echo "error: the 'claude' CLI is not on PATH." >&2
+if ! command -v "$AGENT" >/dev/null 2>&1; then
+  echo "error: the '$AGENT' CLI is not on PATH." >&2
   exit 1
 fi
 unset ANTHROPIC_API_KEY            # force subscription auth (no metered API)
@@ -242,7 +243,7 @@ echo "=============================================================="
 # ============================================================================
 # (optional) Stage A — provisional stubs for breadth  (BACKFILL_STUBS=1)
 # ============================================================================
-claude_try() {   # retry transient failures; $@ = full claude invocation
+agent_try() {   # retry transient failures; $@ = full agent invocation
   local i=1
   while :; do
     "$@" >/dev/null 2>&1 && return 0
@@ -281,7 +282,7 @@ Decode the name parts (project / component / target, split on _ and -) and their
 Provisional stub from first fetch — full deep map pending.
 
 Write ONLY the .knowledge/<repo>/index.md files listed. Mark uncertainty honestly."
-  claude_try claude -p "$APROMPT" --model "$MODEL" --allowedTools "Read,Grep,Glob,Write"
+  agent_try "$AGENT" -p "$APROMPT" --model "$MODEL" --allowedTools "Read,Grep,Glob,Write"
 }
 
 stage_a_worker() {       # $1 = 'proj|csv'
