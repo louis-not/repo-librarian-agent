@@ -52,7 +52,6 @@ if not TOKEN:
 # client just sees the connection drop. List the public hostname(s) here.
 #
 # LIBRARIAN_ALLOWED_HOSTS: comma-separated Host values to allow, e.g.
-#   "bgx-librarian.bikinrame.com" (a ":*" suffix wildcards the port).
 # When unset we DISABLE the Host check: this server already authenticates every
 # request with a bearer token (below), which a browser-driven DNS-rebinding attack
 # cannot forge, so the Host allowlist is redundant here. Set it to re-enable.
