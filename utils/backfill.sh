@@ -74,6 +74,20 @@ RETRIES="${BACKFILL_RETRIES:-3}"
 AGENT="${LIBRARIAN_AGENT:-agy}"           # CLI agent
 MODEL="${LIBRARIAN_MODEL:-sonnet}"        # passed to `--model`
 
+# run_agent <allowed-tools> <prompt> — invoke the configured agent, hiding the
+# flag differences. Claude takes an explicit tool allowlist (stubs need Write);
+# agy has no --allowedTools flag and auto-approves tools in print mode, so it
+# just gets the prompt and model.
+run_agent() {
+  local tools="$1"; shift
+  if [ "$AGENT" = "claude" ]; then
+    claude -p "$1" --model "$MODEL" --allowedTools "$tools"
+  else
+    # agy print mode defaults to a 5m timeout; raise it (override via librarian.conf).
+    "$AGENT" --print-timeout "${LIBRARIAN_AGY_PRINT_TIMEOUT:-30m}" -p "$1" --model "$MODEL"
+  fi
+}
+
 # --- needs_map: mirror digest.sh's skip rule (missing/provisional/stale) ------
 needs_map() {
   local r="$1" f="$KNOW_DIR/$1/index.md" sha
@@ -282,7 +296,7 @@ Decode the name parts (project / component / target, split on _ and -) and their
 Provisional stub from first fetch — full deep map pending.
 
 Write ONLY the .knowledge/<repo>/index.md files listed. Mark uncertainty honestly."
-  agent_try "$AGENT" -p "$APROMPT" --model "$MODEL" --allowedTools "Read,Grep,Glob,Write"
+  agent_try run_agent "Read,Grep,Glob,Write" "$APROMPT"
 }
 
 stage_a_worker() {       # $1 = 'proj|csv'

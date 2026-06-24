@@ -452,10 +452,19 @@ def ask_librarian(question, repos=None, project=None):
     _feed(f"\n┌─ {ts}  ask_librarian  ({scope_label})")
     _feed(f"│  Q: {question}")
 
-    # Stream Claude's real steps so a tmux watcher can see the work live, while
-    # still capturing the final answer to return to the caller.
-    cmd = [AGENT, "-p", prompt, "--model", MODEL, "--allowedTools", ALLOWED_TOOLS,
-           "--verbose", "--output-format", "stream-json"]
+    # Build the agent command. Claude Code accepts a read-only tool allowlist and
+    # can stream structured events (parsed below). Antigravity (agy) has none of
+    # --allowedTools/--verbose/--output-format and prints the final answer as
+    # plain text, so we branch on the configured CLI. Under agy, read-only scope
+    # is enforced by the librarian's instructions (AGENTS.md), not a CLI flag.
+    is_claude = (AGENT == "claude")
+    if is_claude:
+        cmd = [AGENT, "-p", prompt, "--model", MODEL, "--allowedTools", ALLOWED_TOOLS,
+               "--verbose", "--output-format", "stream-json"]
+    else:
+        # agy's print mode caps itself at 5m by default; align it with ASK_TIMEOUT
+        # (Go duration) so the watchdog timer below is what actually bounds the run.
+        cmd = [AGENT, "--print-timeout", f"{ASK_TIMEOUT}s", "-p", prompt, "--model", MODEL]
     proc = subprocess.Popen(cmd, cwd=str(ROOT_DIR), env=env,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             text=True, bufsize=1)
@@ -465,23 +474,36 @@ def ask_librarian(question, repos=None, project=None):
     result_text = None
     assistant_texts = []
     try:
-        for line in proc.stdout:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                evt = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if evt.get("type") == "result":
-                result_text = evt.get("result")
-            elif evt.get("type") == "assistant":
-                for b in evt.get("message", {}).get("content", []):
-                    if b.get("type") == "text" and b.get("text", "").strip():
-                        assistant_texts.append(b["text"].strip())
-            rendered = _render_event(evt)
-            if rendered:
-                _feed(rendered)
+        if is_claude:
+            # Claude streams one JSON event per line; mirror its real steps to the
+            # tmux feed and capture the final answer.
+            for line in proc.stdout:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    evt = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if evt.get("type") == "result":
+                    result_text = evt.get("result")
+                elif evt.get("type") == "assistant":
+                    for b in evt.get("message", {}).get("content", []):
+                        if b.get("type") == "text" and b.get("text", "").strip():
+                            assistant_texts.append(b["text"].strip())
+                rendered = _render_event(evt)
+                if rendered:
+                    _feed(rendered)
+        else:
+            # agy prints the answer as plain text. Echo lines to the feed live so a
+            # tmux watcher still sees progress, and capture the whole output.
+            chunks = []
+            for line in proc.stdout:
+                chunks.append(line)
+                shown = line.rstrip()
+                if shown:
+                    _feed(shown)
+            result_text = "".join(chunks).strip()
         proc.wait()
     finally:
         timer.cancel()
