@@ -2,9 +2,9 @@
 #
 # ask.sh — ask the librarian a question about the mirrored repositories.
 #
-# Spawns a fresh, read-only headless Claude query from the project root, so it
-# loads CLAUDE.md and reads across .repositories/ to answer with citations.
-# Stateless and concurrent: every call is independent.
+# Spawns a fresh, read-only headless agent query (agy or claude) from the project
+# root, so it loads the librarian instructions and reads across .repositories/ to
+# answer with citations. Stateless and concurrent: every call is independent.
 #
 # Usage:
 #   bash utils/ask.sh "how does authentication work in the billing service?"
@@ -42,8 +42,16 @@ fi
 # billing, and --bare would bypass the OAuth/keychain credential entirely.
 unset ANTHROPIC_API_KEY
 
-# Run from the project root so CLAUDE.md auto-loads and .repositories/ is in
-# scope. Read-only tools only — the librarian answers, never modifies.
+# Run from the project root so the librarian's instructions auto-load (CLAUDE.md
+# for `claude`, AGENTS.md for `agy`) and .repositories/ is in scope.
 cd "$ROOT_DIR"
-exec "$AGENT" -p "$QUESTION" --model "$MODEL" \
-  --allowedTools "Read,Grep,Glob,Bash(git log:*),Bash(git show:*),Bash(git blame:*)"
+if [ "$AGENT" = "claude" ]; then
+  # Claude enforces read-only at the CLI via an explicit tool allowlist.
+  exec claude -p "$QUESTION" --model "$MODEL" \
+    --allowedTools "Read,Grep,Glob,Bash(git log:*),Bash(git show:*),Bash(git blame:*)"
+else
+  # Antigravity (agy) has no --allowedTools flag — it auto-approves tools in
+  # print mode and emits a plain-text answer. Read-only scope is enforced by the
+  # librarian's instructions (AGENTS.md), not a CLI allowlist.
+  exec "$AGENT" -p "$QUESTION" --model "$MODEL"
+fi

@@ -96,32 +96,36 @@ your agent runs:
 
 | Your agent runs… | Use | Setup |
 |---|---|---|
-| on **this machine** | stdio `librarian` | one-time `agy mcp add` (below) |
-| on **another machine / a VM** | HTTP `librarian-http` + token | `agy mcp add --transport http …` (below) |
+| on **this machine** | stdio `librarian` | add to `mcp_config.json` (below) |
+| on **another machine / a VM** | HTTP `librarian-http` + token | add HTTP entry to `mcp_config.json` (below) |
+
+> **agy vs claude.** Antigravity has no `agy mcp add` command — it loads MCP
+> servers from a JSON config file (`~/.gemini/antigravity/mcp_config.json`, the
+> standard `mcpServers` schema). Claude Code uses `claude mcp add …`. The entries
+> below are for `agy`; with `claude`, run `claude mcp add --scope user librarian -- python3 "$(pwd)/mcp/librarian_mcp.py"` instead.
 
 ### Local — stdio (recommended on this machine)
 
-Register the stdio server once, at **user scope** so it's available in *every* project:
+Register the stdio server once by adding it to agy's MCP config so it's available
+in *every* project. Merge this into `~/.gemini/antigravity/mcp_config.json`:
 
-```bash
-agy mcp add --scope user librarian -- python3 "$(pwd)/mcp/librarian_mcp.py"
-agy mcp list              # expect: librarian … ✓ Connected
+```json
+{
+  "mcpServers": {
+    "librarian": {
+      "command": "python3",
+      "args": ["/ABS/PATH/TO/repos-agent/mcp/librarian_mcp.py"]
+    }
+  }
+}
 ```
 
-That's it. Open `agy` (or `claude`) in **any** repo and the librarian tools are there. Verify and
-use:
+Restart `agy`, then open it in **any** repo and the librarian tools are there:
 
 ```
 /mcp                         # lists 'librarian' and its tools
 ```
 > "Use the librarian to find how acme_crawler-service feeds the mlops-service."
-
-Or headless from a script / another agent:
-
-```bash
-agy -p "ask the librarian what port the crawler service uses" \
-  --allowedTools "mcp__librarian__ask_librarian"
-```
 
 The stdio server reads `.repositories/` directly and spawns its own `agy -p` (or `claude -p`), so it
 needs the **`librarian` sync session** running (for freshness) but **not** the HTTP one.
@@ -131,14 +135,22 @@ needs the **`librarian` sync session** running (for freshness) but **not** the H
 When the mirror lives on another machine, register that machine's HTTP endpoint. The
 bearer token is generated once by `init.sh` and stored in `.librarian.token`:
 
-```bash
-agy mcp add --transport http librarian-remote http://YOUR_HOST:8008/mcp \
-  --header "Authorization: Bearer $(cat .librarian.token)"
+Merge this into `~/.gemini/antigravity/mcp_config.json` (replace the host and token):
+
+```json
+{
+  "mcpServers": {
+    "librarian-remote": {
+      "serverUrl": "http://YOUR_HOST:8008/mcp",
+      "headers": { "Authorization": "Bearer PASTE_TOKEN_FROM_.librarian.token" }
+    }
+  }
+}
 ```
 
 Notes:
 - Register it under a **different name** (`librarian-remote`) so it doesn't collide with
-  the stdio `librarian` at user scope.
+  the stdio `librarian`.
 - On the VM, `ask_librarian` runs `agy -p` (or `claude -p`) *there*, so the VM needs `agy`
   authenticated.
 - The token is cleartext over plain HTTP. Bind to `127.0.0.1` and front it with an HTTPS

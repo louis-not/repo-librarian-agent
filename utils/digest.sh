@@ -55,6 +55,21 @@ MAP_TOOLS="Read,Grep,Glob,Bash(git log:*),Bash(git show:*),Bash(git diff:*),Writ
 AGENT="${LIBRARIAN_AGENT:-agy}"
 MODEL="${LIBRARIAN_MODEL:-sonnet}"
 
+# run_agent <allowed-tools> <prompt> — invoke the configured agent, hiding the
+# flag differences between the two CLIs. Claude takes an explicit tool allowlist
+# (these maps need Write); agy has no --allowedTools flag and auto-approves tools
+# in print mode, so it just gets the prompt and model. stdout is the caller's.
+run_agent() {
+  local tools="$1"; shift
+  if [ "$AGENT" = "claude" ]; then
+    claude -p "$1" --model "$MODEL" --allowedTools "$tools"
+  else
+    # agy's print mode defaults to a 5m timeout — too short for the multi-doc
+    # aggregation passes — so raise it (Go duration; override via librarian.conf).
+    "$AGENT" --print-timeout "${LIBRARIAN_AGY_PRINT_TIMEOUT:-30m}" -p "$1" --model "$MODEL"
+  fi
+}
+
 # Project code = the repo-name prefix before the first '_' or '-' delimiter.
 # Repos in the org share a high-level project code (acme_crawler-service and
 # acme_harvest-agent both belong to 'acme'); the delimiter is not fixed,
@@ -194,7 +209,7 @@ Then 2-6 bullets capturing the MEANINGFUL changes and the decision/rationale beh
 
 Write ONLY these two files (.knowledge/${name}/index.md and .knowledge/${name}/.pending-entry.md)."
 
-  if "$AGENT" -p "$PROMPT" --model "$MODEL" --allowedTools "$MAP_TOOLS" >/dev/null 2>&1 && [ -f "$kfile" ]; then
+  if run_agent "$MAP_TOOLS" "$PROMPT" >/dev/null 2>&1 && [ -f "$kfile" ]; then
     # Prepend the new entry to the decision log (newest first), then clean up.
     if [ -s "$pending" ]; then
       if [ -f "$decisions" ]; then
@@ -278,7 +293,7 @@ Then these sections, in order:
 ## Shared contracts - the schemas, endpoints, queues, env/config that members share with each other, each cited repo/path:line, naming which member produces and which consumes.
 ## Gotchas - cross-cutting footguns spanning the project.
 Cite real repo/path:line. Mark any link you infer rather than see stated as (inferred). Dense, a map not a transcript. Write ONLY .knowledge/${proj}/overview.md."
-  if "$AGENT" -p "$OPROMPT" --model "$MODEL" --allowedTools "Read,Grep,Glob,Write" >/dev/null 2>&1 \
+  if run_agent "Read,Grep,Glob,Write" "$OPROMPT" >/dev/null 2>&1 \
        && [ -f "$overview" ]; then
     echo "  ok    $proj/overview.md"
     agg_changed=1
@@ -302,7 +317,7 @@ if [ "$projects_total" -ge 2 ] \
   # Read the already-distilled project OVERVIEWS, not the raw per-repo maps. This
   # keeps the input O(projects), not O(repos), so it stays tractable at ~100 repos.
   CPROMPT="You are mapping how an organization's PROJECTS connect, for a code librarian. The projects (each a family of repos sharing a name prefix) are: $(for p in $(printf '%s\n' "${!PROJ_MEMBERS[@]}" | sort); do printf '%s [%s], ' "$p" "${PROJ_MEMBERS[$p]}"; done). Read each project's distilled overview at .knowledge/<project>/overview.md; for a single-repo project that has no overview, read that one repo's map .knowledge/<repo>/index.md instead. Rely on these distilled docs and their cited pointers — do NOT crawl every per-repo map or open .repositories; the overviews already name each project's shared contracts. Write .knowledge/connections.md, focused on edges that CROSS a project boundary (e.g. an acme repo calling a globex repo) — these matter most precisely because they cross families. Cover: (1) a one-line roster of the projects and what each does; (2) every cross-project edge, with direction and mechanism (HTTP endpoint, shared DB/schema, queue, model artifact, file/wire contract), cited repo/path:line as surfaced by the overviews; (3) the end-to-end data flow where it spans projects. Use short bullets and arrows like 'projectA/repo -> projectB/repo: mechanism'. If no cross-project edges exist, say so plainly and just give the roster. Mark inferred links (inferred). Begin with '# Cross-project connections', a blank line, then '_Last built: ${DATE}_'. Write ONLY .knowledge/connections.md."
-  if "$AGENT" -p "$CPROMPT" --model "$MODEL" --allowedTools "Read,Grep,Glob,Write" >/dev/null 2>&1 \
+  if run_agent "Read,Grep,Glob,Write" "$CPROMPT" >/dev/null 2>&1 \
        && [ -f "$conn" ]; then
     echo "  ok    connections.md"
   else
